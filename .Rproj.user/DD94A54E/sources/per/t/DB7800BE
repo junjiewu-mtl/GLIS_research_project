@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1578936082983.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3096982528",
+    "id" : "DB7800BE",
+    "lastKnownWriteTime" : 1579280756,
+    "last_content_update" : 1579280756688,
+    "path" : "~/Desktop/GLIS Research/GLIS_research_project/script/china_data_cleaning.R",
+    "project_path" : "script/china_data_cleaning.R",
+    "properties" : {
+        "cursorPosition" : "133,0",
+        "scrollLine" : "120"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

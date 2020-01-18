@@ -1,0 +1,33 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1579235143305.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "39884CC7",
+    "lastKnownWriteTime" : 4312301946,
+    "last_content_update" : 1579235143305,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "1A5107B9",
+        "caption" : "dt_csv",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=dt_csv&cache_key=1A5107B9",
+        "displayedObservations" : "2245",
+        "environment" : "",
+        "expression" : "dt_csv",
+        "object" : "dt_csv",
+        "preview" : "0",
+        "totalObservations" : "2245",
+        "variables" : "68"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

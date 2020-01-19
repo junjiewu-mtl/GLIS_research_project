@@ -1,0 +1,12 @@
+name: cn_preliminary_analysis_test
+title: cn_preliminary_analysis_test
+username:
+account: junjie
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1674844
+bundleId: 2738263
+url: https://junjie.shinyapps.io/cn_preliminary_analysis_test/
+when: 1579399339.61948
+asMultiple: FALSE
+asStatic: FALSE

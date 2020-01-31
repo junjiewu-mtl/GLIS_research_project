@@ -5,7 +5,8 @@ rm(list = ls())
 
 pacman::p_load(data.table, bit64, openxlsx, haven, dplyr, corrplot, zoo, 
                matrixStats, plotly, DAAG,PerformanceAnalytics, 
-               BiocManager, ISLR, tree, rpart,rpart.plot, arsenal)
+               BiocManager, ISLR, tree, rpart,rpart.plot, arsenal, rattle,
+               RColorBrewer, statsr, tidyverse)
 
 setwd('~/Desktop/GLIS Research/GLIS_research_project/data')
 
@@ -87,6 +88,51 @@ dt_aes_sus <- dt_aes_sus[Q41.Sex < 3,]
 dt_aes_sus$Q41.Sex <- as.factor(ifelse(dt_aes_sus$Q41.Sex<=1, "Male", "Female"))
 #write.csv(dt_aes_sus, '../script/cn_preliminary_analysis/cn_h1_sum.csv', row.names = F)
 
+##########3#Bayesian inference for two independent means
+dt_a_s <- dt[, c(65,70,71)]
+dt_a_s[, score_sum := aes_val + sus_val]
+dt_a_s[Q41.Sex <1.5, Q41.Sex:=1]
+dt_a_s[Q41.Sex >= 1.5, Q41.Sex:=2]
+dt_a_s$Q41.Sex <- as.factor(dt_a_s$Q41.Sex)
+
+ggplot(dt_a_s, aes(x = Q41.Sex, y = score_sum)) +
+  geom_boxplot()
+
+bayes_inference(y = score_sum, x = Q41.Sex, data = dt_a_s, 
+                statistic = "mean", 
+                type = "ht", alternative = "twosided", null = 0, 
+                prior = "JZS", rscale = 1, 
+                method = "theoretical", show_plot = FALSE)
+
+score_post <- bayes_inference(y = score_sum, x = Q41.Sex, data = dt_a_s, 
+                              statistic = "mean", 
+                              type = "ci", mu_0 = 0, 
+                              prior = "JZS", rscale = 1, 
+                              method = "simulation")
+
+
+########### Prediction using MCMC
+
+dt_male <- dt_a_s[Q41.Sex == 1,]
+
+male_post <- bayes_inference(y = score_sum, data = dt_male, 
+                              statistic = "mean", 
+                              type = "ci", mu_0 = 43.9, 
+                              prior = "JZS", rscale = 1, 
+                              method = "simulation")
+
+samples = as.data.frame(male_post$samples)
+nsim = nrow(samples)
+samples = mutate(samples, y_pred = rnorm(nsim, mu, sqrt(sig2)))
+
+ggplot(data = samples, aes(x = y_pred)) + 
+  geom_histogram(aes(y = ..density..), bins = 100) +
+  geom_density() + 
+  xlab(expression(y[new]))
+
+dplyr::select(samples, mu, y_pred) %>%
+  map(quantile, probs=c(0.025, 0.50, 0.975))
+
 dt_a <- dt_individual
 
 ## 75% of the sample size
@@ -101,9 +147,13 @@ test <- dt_a[-train_ind, ]
 
 # regression tree
 
-rtree.dt_a = rpart(Q41.Sex ~ ., data=dt_a, method = 'class')
+rtree.dt_a = rpart(Q41.Sex ~ ., data=train, method = 'class',   minsplit = 2, 
+                   minbucket = 1, 
+                   cp = 0.008)
+
+summary(rtree.dt_a)
 # Plot the tree using prp command defined in rpart.plot package
-prp(rtree.dt_a)
+fancyRpartPlot(rtree.dt_a)
 
 t_pred = predict(rtree.dt_a,test,type="class")
 

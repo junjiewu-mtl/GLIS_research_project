@@ -13,6 +13,8 @@ library(rpart.plot)
 library(plotly)
 library(arsenal)
 library(ggplot2)
+library(rattle)
+library(RColorBrewer)
 
 # Define UI for application 
 ui <- 
@@ -20,22 +22,26 @@ ui <-
     navbarPage("cn_preliminary_analysis",
                tabPanel("H1 Decision Tree: Individual Response",
                         mainPanel(
-                            plotOutput("h1_ind")
+                            plotOutput("h1_ind",
+                                       width = "100%", height = "600px")
                         )
                ),
                tabPanel("H1 Decision Tree: aes and sus score",
                         mainPanel(
-                            plotOutput("h1_sum")
+                            plotOutput("h1_sum",
+                                       width = "100%", height = "600px")
                         )
                ),
                tabPanel("H2 Linear Regression",
                         mainPanel(
-                            plotlyOutput("h2")
+                            plotlyOutput("h2",
+                                         width = "100%", height = "600px")
                         )
                ),
                tabPanel("H3 Linear Regression",
                         mainPanel(
-                            plotlyOutput("h3")
+                            plotlyOutput("h3",
+                                         width = "100%", height = "600px")
                         )
                ),
                tabPanel('Descriptive Analysis: Q31 & Q38',
@@ -59,7 +65,6 @@ server <- function(input, output) {
             labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
                                "Intercept =",signif(fit$coef[[1]],5 ),
                                " Slope =",signif(fit$coef[[2]], 5),
-                               " P =",signif(summary(fit)$coef[2,4], 5),
                                " Accuarcy rate=", round(correlation_accuracy, digits = 2)))
     }
 
@@ -75,11 +80,12 @@ server <- function(input, output) {
         test <- dt_a[-train_ind, ]
         
         # regression tree
-        rtree.dt_a = rpart(Q41.Sex ~ ., data=train, method = 'anova')
+        rtree.dt_a = rpart(Q41.Sex ~ ., data=train, method = 'class',   minsplit = 2, 
+                           minbucket = 1, 
+                           cp = 0.008)
         # Plot the tree using prp command defined in rpart.plot package
         t_pred = predict(rtree.dt_a,test,type="class")
-        mean(test$Q41.Sex == t_pred) 
-        prp(rtree.dt_a, main = c('accuracy_rate',round(mean(test$Q41.Sex == t_pred), digits = 2)))
+        fancyRpartPlot(rtree.dt_a, main = c('accuracy_rate',round(mean(test$Q41.Sex == t_pred), digits = 2)))
     })
     
     output$h1_sum <- renderPlot({
@@ -98,7 +104,7 @@ server <- function(input, output) {
         # Plot the tree using prp command defined in rpart.plot package
         t_pred = predict(rtree.dt_a,test,type="class")
         mean(test$Q41.Sex == t_pred) 
-        prp(rtree.dt_a, main = c('accuracy_rate',round(mean(test$Q41.Sex == t_pred), digits = 2)))
+        fancyRpartPlot(rtree.dt_a, main = c('accuracy_rate',round(mean(test$Q41.Sex == t_pred), digits = 2)))
     })
     
     output$h2 <- renderPlotly({
@@ -157,4 +163,3 @@ server <- function(input, output) {
 # Run the application 
 shinyApp(ui = ui, server = server)
 
-#deployApp()

@@ -6,7 +6,7 @@ rm(list = ls())
 pacman::p_load(data.table, bit64, openxlsx, haven, dplyr, corrplot, zoo, 
                matrixStats, plotly, DAAG,PerformanceAnalytics, 
                BiocManager, ISLR, tree, rpart,rpart.plot, arsenal, rattle,
-               RColorBrewer, statsr, tidyverse)
+               RColorBrewer, statsr, tidyverse, arules)
 
 setwd('~/Desktop/GLIS Research/GLIS_research_project/data')
 
@@ -28,13 +28,18 @@ setwd('~/Desktop/GLIS Research/GLIS_research_project/data')
 # write.csv(dt_merged, 'knn_imputed_cn_data.csv', row.names = F)
 
 # ####################################################################
-dt <- fread('knn_imputed_cn_data.csv')[,-1]
+dt <- read.csv('knn_imputed_cn_data.csv')[,-1]
 
-# dt_csv_mean <- sapply(dt[,37:56], mean, na.rm=TRUE)
-# 
-# 
-# View(sort(dt_csv_mean, decreasing = T))
+round_df <- function(x, digits) {
+  # round all numeric variables
+  # x: data frame 
+  # digits: number of digits to round
+  numeric_columns <- sapply(x, mode) == 'numeric'
+  x[numeric_columns] <-  round(x[numeric_columns], digits)
+  x
+}
 
+dt <- data.table(round_df(dt, 0))
 
 # sustainable value
 dt[, `:=`(sus_val = rowSums(.SD, na.rm=T)), .SDcols=c(41,49:56)]
@@ -47,6 +52,22 @@ dt[, green_con := rowSums(.SD, na.rm=T), .SDcols=c(1:5)]
 
 #Consumer Innovativeness
 dt[, con_inno := rowSums(.SD, na.rm=T), .SDcols=c(50:56, 58:62)]
+
+#Social/Ethical
+dt[, soc_eth := rowSums(.SD, na.rm=T), .SDcols=c(53:56)]
+
+#Aes/fun
+dt[, aes_fun := rowSums(.SD, na.rm=T), .SDcols=c(37,39,40)]
+
+#functional
+dt[, functional := rowSums(.SD, na.rm=T), .SDcols=c(38, 47)]
+
+#symbolic
+dt[, symbolic := rowSums(.SD, na.rm=T), .SDcols=c(44,46)]
+
+# financial
+dt[, financial := rowSums(.SD, na.rm=T), .SDcols=c(45)]
+
 
 ################### scatter plot function: ggplotRegression ################### 
 ggplotRegression <- function (fit) {
@@ -88,21 +109,24 @@ dt_aes_sus <- dt_aes_sus[Q41.Sex < 3,]
 dt_aes_sus$Q41.Sex <- as.factor(ifelse(dt_aes_sus$Q41.Sex<=1, "Male", "Female"))
 #write.csv(dt_aes_sus, '../script/cn_preliminary_analysis/cn_h1_sum.csv', row.names = F)
 
-##########3#Bayesian inference for two independent means
+########## Bayesian inference for two independent means ##########
 dt_a_s <- dt[, c(65,70,71)]
 dt_a_s[, score_sum := aes_val + sus_val]
 dt_a_s[Q41.Sex <1.5, Q41.Sex:=1]
 dt_a_s[Q41.Sex >= 1.5, Q41.Sex:=2]
 dt_a_s$Q41.Sex <- as.factor(dt_a_s$Q41.Sex)
+#write.csv(dt_a_s, '../script/cn_preliminary_analysis/cn_h1_bae.csv', row.names = F)
 
 ggplot(dt_a_s, aes(x = Q41.Sex, y = score_sum)) +
   geom_boxplot()
 
-bayes_inference(y = score_sum, x = Q41.Sex, data = dt_a_s, 
+score_p <- bayes_inference(y = score_sum, x = Q41.Sex, data = dt_a_s, 
                 statistic = "mean", 
                 type = "ht", alternative = "twosided", null = 0, 
                 prior = "JZS", rscale = 1, 
-                method = "theoretical", show_plot = FALSE)
+                method = "theoretical")
+
+summary(score_p)
 
 score_post <- bayes_inference(y = score_sum, x = Q41.Sex, data = dt_a_s, 
                               statistic = "mean", 
@@ -111,8 +135,9 @@ score_post <- bayes_inference(y = score_sum, x = Q41.Sex, data = dt_a_s,
                               method = "simulation")
 
 
-########### Prediction using MCMC
+########### Prediction using MCMC ########### 
 
+#predict mean sum of male
 dt_male <- dt_a_s[Q41.Sex == 1,]
 
 male_post <- bayes_inference(y = score_sum, data = dt_male, 
@@ -121,17 +146,38 @@ male_post <- bayes_inference(y = score_sum, data = dt_male,
                               prior = "JZS", rscale = 1, 
                               method = "simulation")
 
-samples = as.data.frame(male_post$samples)
-nsim = nrow(samples)
-samples = mutate(samples, y_pred = rnorm(nsim, mu, sqrt(sig2)))
+m_samples = as.data.frame(male_post$samples)
+m_nsim = nrow(m_samples)
+m_samples = mutate(m_samples, y_pred = rnorm(m_nsim, mu, sqrt(sig2)))
 
-ggplot(data = samples, aes(x = y_pred)) + 
+ggplot(data = m_samples, aes(x = y_pred)) + 
   geom_histogram(aes(y = ..density..), bins = 100) +
   geom_density() + 
   xlab(expression(y[new]))
 
-dplyr::select(samples, mu, y_pred) %>%
-  map(quantile, probs=c(0.025, 0.50, 0.975))
+dplyr::select(m_samples, mu, y_pred) %>%
+  map(quantile, probs=c(0.025, 0.1, 0.50, 0.9, 0.975))
+
+#predict mean sum of female
+dt_female <- dt_a_s[Q41.Sex == 2,]
+
+female_post <- bayes_inference(y = score_sum, data = dt_female, 
+                             statistic = "mean", 
+                             type = "ci", mu_0 = 43.9, 
+                             prior = "JZS", rscale = 1, 
+                             method = "simulation")
+
+f_samples = as.data.frame(female_post$samples)
+f_nsim = nrow(f_samples)
+f_samples = mutate(f_samples, y_pred = rnorm(f_nsim, mu, sqrt(sig2)))
+
+ggplot(data = f_samples, aes(x = y_pred)) + 
+  geom_histogram(aes(y = ..density..), bins = 100) +
+  geom_density() + 
+  xlab(expression(y[new]))
+
+dplyr::select(f_samples, mu, y_pred) %>%
+  map(quantile, probs=c(0.025, 0.1, 0.50, 0.9, 0.975))
 
 dt_a <- dt_individual
 
@@ -145,7 +191,154 @@ train_ind <- sample(seq_len(nrow(dt_a)), size = smp_size)
 train <- dt_a[train_ind, ]
 test <- dt_a[-train_ind, ]
 
-# regression tree
+
+###################### Apriori ###################### 
+
+dt_ap <- dt
+### Association rules between appareal cues lables and demographic labels ###
+
+#Catagorized value into 3 levels
+# sustainable value
+dt_ap[,sus_val:= cut(sus_val,3,include.lowest=TRUE,
+                             labels=c("Low", "Middle", "High"))]
+# aesthetic values
+dt_ap[,aes_val:= cut(aes_val,3,include.lowest=TRUE,
+                   labels=c("Low", "Middle", "High"))]
+#Green Consciousness
+dt_ap[,green_con:= cut(green_con,3,include.lowest=TRUE,
+                   labels=c("Low", "Middle", "High"))]
+#Consumer Innovativeness
+dt_ap[,con_inno:= cut(con_inno,3,include.lowest=TRUE,
+                   labels=c("Low", "Middle", "High"))]
+
+#Social/Ethical
+dt_ap[,soc_eth:= cut(soc_eth,3,include.lowest=TRUE,
+                      labels=c("Low", "Middle", "High"))]
+#Aes/fun
+dt_ap[,aes_fun:= cut(aes_fun,3,include.lowest=TRUE,
+                      labels=c("Low", "Middle", "High"))]
+#functional
+dt_ap[,functional:= cut(functional,3,include.lowest=TRUE,
+                      labels=c("Low", "Middle", "High"))]
+#symbolic
+dt_ap[,symbolic:= cut(symbolic,3,include.lowest=TRUE,
+                      labels=c("Low", "Middle", "High"))]
+# financial
+dt_ap[,financial:= as.factor(ifelse(dt_ap[,"financial"]>3, "High", "Low"))]
+
+# Selected label value 
+dt_ap <- dt_ap[,c(63:68,70:78)]
+dt_ap <- dt_ap %>%
+  mutate_if(is.numeric, as.factor)
+
+#drop edu lev, age, employ
+dt_ap <- dt_ap[,-c(64,67,68)]
+
+rules <- apriori(dt_ap,
+                 parameter = list(supp = 0.5, conf = 0.3, maxlen = 4))
+
+inspect((sort(rules, by = "confidence"))[1:20])
+
+
+top10subRules <- head(rules, n = 10, by = "confidence")
+
+plot(top10subRules, method = "graph",  engine = "htmlwidget")
+
+
+
+subset.rules <- which(colSums(is.subset(rules, rules)) > 1) # get subset rules in vector
+length(subset.rules)  #> 3913
+
+
+
+dt_ap$ID <- seq.int(nrow(dt_ap))
+
+dt_ap <- dt_ap[,-c(30:36, 41:43, 49:56, 58:62, 1:5)]
+
+dt_ap_cat <- data.frame(ifelse(dt_ap[,1:34]>2, "High", "Low"))
+
+dt_ap_cat$ID <- seq.int(nrow(dt_ap_cat))
+
+dtap <- merge(dt_ap[,35:46],dt_ap_cat, by = 'ID')
+
+# drop 
+dtap <- dtap %>%
+  select(-ID, -total_score) %>% 
+  mutate_if(is.numeric, as.factor)
+
+
+rules <- apriori(dtap,
+                 parameter = list(supp = 0.9, conf = 0.9),
+                 appearance = list(default="lhs", rhs = c("Q41.Sex=Male")))
+
+
+
+
+
+
+
+
+
+inspect(rules)[1:10]
+
+
+inspect(head(sort(rules, by = "lift")))
+
+
+#catagorized across gender
+dt_aes_sus[,dt_aes_val:= cut(aes_val,3,include.lowest=TRUE,
+                             labels=c("Low", "Middle","High"))]
+
+dt_aes_sus[,dt_sus_val:= cut(sus_val,3,include.lowest=TRUE,
+                             labels=c("Low", "Middle","High"))]
+
+dt_aes_sus <- dt_aes_sus %>% dplyr::select(Q41.Sex, dt_sus_val, dt_aes_val)
+
+# dt_in_factor <- dt_individual %>%
+#   mutate_if(sapply(dt_individual, is.numeric), as.factor)
+
+
+# df_m <- dt_aes_sus %>% filter(Q41.Sex == "Male") %>% 
+#   select(dt_sus_val, dt_aes_val) 
+# 
+# df_f <- dt_aes_sus %>% filter(Q41.Sex == "Female") %>% 
+#   select(dt_sus_val, dt_aes_val) 
+
+dt_ap <- dt[,-(30:36)]
+
+rules.male <- apriori(dt_aes_sus,
+                      parameter = list(supp=0.1, conf=0.01),
+                      appearance = list(default="lhs", rhs = c("Q41.Sex=Male")))
+
+rules.female <- apriori(dt_aes_sus,
+                        parameter = list(supp = 0.1, conf = 0.01),
+                        appearance = list(default="lhs", rhs = c("Q41.Sex=Female")))
+
+
+inspect(head(sort(rules.male, by = "confidence")))
+inspect(head(sort(rules.female, by = "confidence")))
+
+############# run apriori separately ############# 
+df_m <- dt_aes_sus %>% select(Q41.Sex, dt_sus_val, dt_aes_val) %>% 
+  filter(Q41.Sex == "Male") %>% 
+  mutate_if(is.numeric,as.factor)
+
+df_f <- dt_aes_sus %>% select(Q41.Sex, dt_sus_val, dt_aes_val) %>% 
+  filter(Q41.Sex == "Female") %>% 
+  mutate_if(is.numeric,as.factor)
+
+rules.male <- apriori(df_m, control = list(verbose=F),
+                      parameter = list(supp = 0.001, conf = 0.5),
+                      appearance = list(default="lhs", rhs = c("Q41.Sex=Male")))
+
+rules.female <- apriori(df_f, control = list(verbose=F),
+                        parameter = list(supp = 0.001, conf = 0.5),
+                        appearance = list(default="lhs", rhs = c("Q41.Sex=Female")))
+
+inspect(head(sort(rules.male, by = "confidence")))
+inspect(head(sort(rules.female, by = "confidence")))
+
+####################### regression tree  ####################### 
 
 rtree.dt_a = rpart(Q41.Sex ~ ., data=train, method = 'class',   minsplit = 2, 
                    minbucket = 1, 
@@ -221,7 +414,7 @@ dt_2[, sus_aes := sus_val+aes_val]
 
 dt_2 <- dt_2[,c(73,74)]
 
-write.csv(dt_2, '../script/cn_preliminary_analysis/cn_h2.csv', row.names = F)
+#write.csv(dt_2, '../script/cn_preliminary_analysis/cn_h2.csv', row.names = F)
 
 ## 75% of the sample size
 smp_size <- floor(0.75 * nrow(dt_2))
@@ -250,7 +443,7 @@ ggplotRegression(linear_2)
 
 dt_3 <- dt[,c(70,72)]
 
-write.csv(dt_3, '../script/cn_preliminary_analysis/cn_h3.csv', row.names = F)
+#write.csv(dt_3, '../script/cn_preliminary_analysis/cn_h3.csv', row.names = F)
 ## 75% of the sample size
 smp_size <- floor(0.75 * nrow(dt_3))
 

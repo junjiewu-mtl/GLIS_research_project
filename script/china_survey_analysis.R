@@ -8,7 +8,7 @@ pacman::p_load(data.table, bit64, openxlsx, haven, dplyr, corrplot, zoo,
                BiocManager, ISLR, tree, rpart,rpart.plot, arsenal, rattle,
                RColorBrewer, statsr, tidyverse, arules)
 
-setwd('~/Desktop/GLIS Research/GLIS_research_project/data')
+setwd('~/Desktop/GLIS Research/GLIS_research_project/data') 
 
 ###################### missing value imputation #####################
 # dt <- fread('cleaned_01_16_cn.csv')
@@ -27,7 +27,7 @@ setwd('~/Desktop/GLIS Research/GLIS_research_project/data')
 # 
 # write.csv(dt_merged, 'knn_imputed_cn_data.csv', row.names = F)
 
-# ####################################################################
+####################################################################
 dt <- read.csv('knn_imputed_cn_data.csv')[,-1]
 
 round_df <- function(x, digits) {
@@ -41,35 +41,35 @@ round_df <- function(x, digits) {
 
 dt <- data.table(round_df(dt, 0))
 
-# sustainable value
-dt[, `:=`(sus_val = rowSums(.SD, na.rm=T)), .SDcols=c(41,49:56)]
+#########################  Aggregate Updated Cues #########################  
+# directly product cues (1-10)
+dt[, `:=`(product_cues_1_10 = rowSums(.SD, na.rm=T)), .SDcols=c(38:43, 47:49)]
 
-# aesthetic values
-dt[, aes_val := rowSums(.SD, na.rm=T), .SDcols=c(42:43)]
+# indirectly product cues (11-13)
+dt[, `:=`(product_cues_11_13 = rowSums(.SD, na.rm=T)), .SDcols=c(44:46)]
 
-#Green Consciousness
-dt[, green_con := rowSums(.SD, na.rm=T), .SDcols=c(1:5)]
+# production-related sustainable cues (item a-g)
+dt[, `:=`(production_cues_a_g = rowSums(.SD, na.rm=T)), .SDcols=c(50:56)]
 
-#Consumer Innovativeness
-dt[, con_inno := rowSums(.SD, na.rm=T), .SDcols=c(50:56, 58:62)]
+# product-related sustainable cues (item 8-10)
+dt[, `:=`(product_cues_8_10 = rowSums(.SD, na.rm=T)), .SDcols=c(41, 48, 49)]
 
-#Social/Ethical
-dt[, soc_eth := rowSums(.SD, na.rm=T), .SDcols=c(53:56)]
+# product-related sustainable cues (item 1-7 and 11-13)
+dt[, `:=`(product_cues_8_10 = rowSums(.SD, na.rm=T)), .SDcols=c(38:40, 42:47)]
 
-#Aes/fun
-dt[, aes_fun := rowSums(.SD, na.rm=T), .SDcols=c(37,39,40)]
+# aesthetic aspect
+dt[, aesthetic_aspect := rowSums(.SD, na.rm=T), .SDcols=c(42:43)]
 
-#functional
-dt[, functional := rowSums(.SD, na.rm=T), .SDcols=c(38, 47)]
+# functional aspect
+dt[, functional_aspect := rowSums(.SD, na.rm=T), .SDcols=c(38, 47)]
 
-#symbolic
-dt[, symbolic := rowSums(.SD, na.rm=T), .SDcols=c(44,46)]
+# sustainable commitment
+dt[, sustainable_commitment := rowSums(.SD, na.rm=T), .SDcols=c(9, 13:18, 20, 28)]
 
-# financial
-dt[, financial := rowSums(.SD, na.rm=T), .SDcols=c(45)]
+# fashion innovativeness
+dt[, fashion_innovativeness := rowSums(.SD, na.rm=T), .SDcols=c(57:62)]
 
-
-################### scatter plot function: ggplotRegression ################### 
+######################### scatter plot function: ggplotRegression ######################### 
 ggplotRegression <- function (fit) {
   
   require(ggplot2)
@@ -179,17 +179,7 @@ ggplot(data = f_samples, aes(x = y_pred)) +
 dplyr::select(f_samples, mu, y_pred) %>%
   map(quantile, probs=c(0.025, 0.1, 0.50, 0.9, 0.975))
 
-dt_a <- dt_individual
 
-## 75% of the sample size
-smp_size <- floor(0.75 * nrow(dt_a))
-
-## set the seed to make your partition reproducible
-set.seed(123)
-train_ind <- sample(seq_len(nrow(dt_a)), size = smp_size)
-
-train <- dt_a[train_ind, ]
-test <- dt_a[-train_ind, ]
 
 
 ###################### Apriori ###################### 
@@ -340,6 +330,18 @@ inspect(head(sort(rules.female, by = "confidence")))
 
 ####################### regression tree  ####################### 
 
+dt_a <- dt_individual
+
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(dt_a))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(dt_a)), size = smp_size)
+
+train <- dt_a[train_ind, ]
+test <- dt_a[-train_ind, ]
+
 rtree.dt_a = rpart(Q41.Sex ~ ., data=train, method = 'class',   minsplit = 2, 
                    minbucket = 1, 
                    cp = 0.008)
@@ -367,45 +369,6 @@ text(tree.dt_a, pretty = 0)
 tree.pred = predict(tree.dt_a, dt_a[-train_ind, ], type="class")
 
 with(dt_a[-train_ind,], table(tree.pred, Q41.Sex))
-
-# 
-# missmap(dt, main = Missing values vs observed)
-# 
-# #drop NA 
-# dt_a <- data.table(dt_a[complete.cases(dt_a),])
-# 
-# dt_a <- dt_a[Q41.Sex < 3]
-# dt_a[, Sex := Q41.Sex - 1]
-# 
-# correlations <- cor(dt_a[,1:7])
-# corrplot(correlations, method=circle)
-# 
-# 
-# ## 75% of the sample size
-# smp_size <- floor(0.75 * nrow(dt_a))
-# 
-# ## set the seed to make your partition reproducible
-# set.seed(123)
-# train_ind <- sample(seq_len(nrow(dt_a)), size = smp_size)
-# 
-# train <- dt_a[train_ind, ]
-# test <- dt_a[-train_ind, ]
-# 
-# # dt_a <- lapply(dt_a, as.factor)
-# # dt_a[Q41.Sex] <- as.numeric(dt_a[Q41.Sex])
-# 
-# mylogit <- glm(Sex ~ Q31a.Fit + Q31c.Fibre.Material + Q31d.Quality.Workmanship + Q31f.Colour + Q31g.Style, data = train, family = binomial)
-# 
-# summary(mylogit)
-# 
-# fitted.results <- predict(mylogit,newdata=subset(test,select=c(2,3,4,5,6,7)),type='response')
-# fitted.results <- ifelse(fitted.results > 0.5,1,0)
-# 
-# misClasificError <- mean(fitted.results != test$Sex)
-# print(paste('Accuracy',1-misClasificError))
-# 
-# 
-# confint(mylogit)
 
 ######################### Q2 ###############################
 

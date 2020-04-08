@@ -6,9 +6,9 @@ rm(list = ls())
 pacman::p_load(data.table, bit64, openxlsx, haven, dplyr, corrplot, zoo, 
                matrixStats, plotly, DAAG,PerformanceAnalytics, 
                BiocManager, ISLR, tree, rpart,rpart.plot, arsenal, rattle,
-               RColorBrewer, statsr, tidyverse, arules)
+               RColorBrewer, statsr, tidyverse, arules,arulesViz, OneR)
 
-setwd('~/Desktop/GLIS Research/GLIS_research_project/data') 
+setwd('~/Desktop/GLIS_Research/GLIS_research_project/data') 
 
 ###################### missing value imputation #####################
 # dt <- fread('cleaned_01_16_cn.csv')
@@ -48,6 +48,9 @@ dt[, `:=`(product_cues_1_10 = rowSums(.SD, na.rm=T)), .SDcols=c(38:43, 47:49)]
 # indirectly product cues (11-13)
 dt[, `:=`(product_cues_11_13 = rowSums(.SD, na.rm=T)), .SDcols=c(44:46)]
 
+#product cues (1-13)
+dt[, `:=`(product_cues_1_13 = rowSums(.SD, na.rm=T)), .SDcols=c(38:49)]
+
 # production-related sustainable cues (item a-g)
 dt[, `:=`(production_cues_a_g = rowSums(.SD, na.rm=T)), .SDcols=c(50:56)]
 
@@ -55,7 +58,7 @@ dt[, `:=`(production_cues_a_g = rowSums(.SD, na.rm=T)), .SDcols=c(50:56)]
 dt[, `:=`(product_cues_8_10 = rowSums(.SD, na.rm=T)), .SDcols=c(41, 48, 49)]
 
 # product-related sustainable cues (item 1-7 and 11-13)
-dt[, `:=`(product_cues_8_10 = rowSums(.SD, na.rm=T)), .SDcols=c(38:40, 42:47)]
+dt[, `:=`(product_cues_1_7_11_13 = rowSums(.SD, na.rm=T)), .SDcols=c(38:40, 42:47)]
 
 # aesthetic aspect
 dt[, aesthetic_aspect := rowSums(.SD, na.rm=T), .SDcols=c(42:43)]
@@ -68,7 +71,16 @@ dt[, sustainable_commitment := rowSums(.SD, na.rm=T), .SDcols=c(9, 13:18, 20, 28
 
 # fashion innovativeness
 dt[, fashion_innovativeness := rowSums(.SD, na.rm=T), .SDcols=c(57:62)]
+# cut at 21
+dt$fashion_innovativeness[dt$fashion_innovativeness >= 21] <-  "high"
+dt$fashion_innovativeness[dt$fashion_innovativeness != "high"] <-  "low"
 
+#Catagorized value into 2 levels
+# sustainable value
+dt[,c(1:29,37:63,70:78)] <- bin(dt[,c(1:29,37:63,70:78)], nbins = 2, method = c("clusters"))
+
+#drop other gender
+dt$Q41.Sex <- as.factor(ifelse(dt$Q41.Sex<=1, "Male", "Female"))
 ######################### scatter plot function: ggplotRegression ######################### 
 ggplotRegression <- function (fit) {
   
@@ -95,7 +107,6 @@ summary(table_one,text=TRUE)
 #write.table(table_one, '../script/cn_preliminary_analysis/cn_h1.csv')
 
 ################################################################################ 
-
 
 ######################### Q1 ###############################
 
@@ -184,55 +195,197 @@ dplyr::select(f_samples, mu, y_pred) %>%
 
 ###################### Apriori ###################### 
 
-dt_ap <- dt
+dt_a <- dt
+
 ### Association rules between appareal cues lables and demographic labels ###
 
-#Catagorized value into 3 levels
-# sustainable value
-dt_ap[,sus_val:= cut(sus_val,3,include.lowest=TRUE,
-                             labels=c("Low", "Middle", "High"))]
-# aesthetic values
-dt_ap[,aes_val:= cut(aes_val,3,include.lowest=TRUE,
-                   labels=c("Low", "Middle", "High"))]
-#Green Consciousness
-dt_ap[,green_con:= cut(green_con,3,include.lowest=TRUE,
-                   labels=c("Low", "Middle", "High"))]
-#Consumer Innovativeness
-dt_ap[,con_inno:= cut(con_inno,3,include.lowest=TRUE,
-                   labels=c("Low", "Middle", "High"))]
+#General Question
+dt_ag <- dt_a[,c(73:74)] 
 
-#Social/Ethical
-dt_ap[,soc_eth:= cut(soc_eth,3,include.lowest=TRUE,
-                      labels=c("Low", "Middle", "High"))]
-#Aes/fun
-dt_ap[,aes_fun:= cut(aes_fun,3,include.lowest=TRUE,
-                      labels=c("Low", "Middle", "High"))]
-#functional
-dt_ap[,functional:= cut(functional,3,include.lowest=TRUE,
-                      labels=c("Low", "Middle", "High"))]
-#symbolic
-dt_ap[,symbolic:= cut(symbolic,3,include.lowest=TRUE,
-                      labels=c("Low", "Middle", "High"))]
-# financial
-dt_ap[,financial:= as.factor(ifelse(dt_ap[,"financial"]>3, "High", "Low"))]
-
-# Selected label value 
-dt_ap <- dt_ap[,c(63:68,70:78)]
-dt_ap <- dt_ap %>%
-  mutate_if(is.numeric, as.factor)
-
-#drop edu lev, age, employ
-dt_ap <- dt_ap[,-c(64,67,68)]
-
-rules <- apriori(dt_ap,
-                 parameter = list(supp = 0.5, conf = 0.3, maxlen = 4))
-
-inspect((sort(rules, by = "confidence"))[1:20])
+rules_ag <- apriori(dt_ag,
+                    parameter = list(supp = 0.1, conf = 0.1, maxlen=2))
 
 
-top10subRules <- head(rules, n = 10, by = "confidence")
+inspect((sort(rules_ag, by = "confidence"))[1:6])
 
-plot(top10subRules, method = "graph",  engine = "htmlwidget")
+
+#QA1-A3
+dt_a1 <- dt_a[,c(65,76)] 
+
+
+rules_a1 <- apriori(dt_a1,
+                 parameter = list(supp = 0.1, conf = 0.1, maxlen=2),
+                 appearance = list(default="rhs", lhs = c("Q41.Sex=Male")))
+
+
+inspect((sort(rules_a1, by = "confidence"))[1:5])
+
+#QA4-A5
+dt_a2 <- dt_a[,c(38:49, 65)]
+
+rules_a2 <- apriori(dt_a2,
+                 parameter = list(supp = 0.1, conf = 0.5, maxlen=2),
+                 appearance = list(default="rhs", lhs = c("Q41.Sex=Female")))
+
+inspect((sort(rules_a2, by = "confidence"))[1:18])
+
+#QA6-A7
+dt_a3 <- dt_a[,c(50:56, 65)]
+
+rules_a3 <- apriori(dt_a3,
+                    parameter = list(supp = 0.1, conf = 0.5, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("Q41.Sex=Male")))
+
+inspect((sort(rules_a3, by = "confidence"))[1:10])
+
+#
+dt_b <- dt
+
+#QB1
+dt_b1 <- dt_b[,c(78, 65)]
+
+rules_b1 <- apriori(dt_b1,
+                    parameter = list(supp = 0.01, conf = 0.1, maxlen=2),
+                    appearance = list(default="lhs", rhs = c("sustainable_commitment=high")))
+
+inspect((sort(rules_b1, by = "confidence"))[1:3])
+
+#QB2
+dt_b2 <- dt_b[,c(78,74,75)]
+
+rules_b2 <- apriori(dt_b2,
+                    parameter = list(supp = 0.01, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("sustainable_commitment=high")))
+
+inspect((sort(rules_b2, by = "confidence"))[1:3])
+
+#QB3
+dt_b3 <- dt_b[,c(78,70)]
+
+rules_b3 <- apriori(dt_b3,
+                    parameter = list(supp = 0.01, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("sustainable_commitment=high")))
+
+inspect((sort(rules_b3, by = "confidence"))[1:3])
+
+#QB4
+dt_b4 <- dt_b[,c(78,73)]
+
+rules_b4 <- apriori(dt_b4,
+                    parameter = list(supp = 0.01, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("sustainable_commitment=high")))
+
+inspect((sort(rules_b4, by = "confidence"))[1:5])
+
+#QB5-6
+dt_b5 <- dt_b[,c(38:49, 78)]
+
+rules_b5 <- apriori(dt_b5,
+                    parameter = list(supp = 0.1, conf = 0.5, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("sustainable_commitment=high")))
+
+inspect((sort(rules_b5, by = "lift"))[1:10])
+
+#QB7-8
+dt_b6 <- dt_b[,c(50:56, 78)]
+
+rules_b6 <- apriori(dt_b6,
+                    parameter = list(supp = 0.1, conf = 0.4, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("sustainable_commitment=low")))
+
+inspect((sort(rules_b6, by = "lift"))[1:10])
+
+#QC1
+dt_c <- dt
+dt_c1 <- dt_c[,c(79, 76)]
+
+rules_c1 <- apriori(dt_c1,
+                    parameter = list(supp = 0.1, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("fashion_innovativeness=low")))
+
+inspect((sort(rules_c1, by = "confidence"))[1:4])
+
+#QC2
+dt_c <- dt
+dt_c2 <- dt_c[,c(79, 77)]
+
+rules_c2 <- apriori(dt_c2,
+                    parameter = list(supp = 0.1, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("fashion_innovativeness=high")))
+
+inspect((sort(rules_c2, by = "confidence"))[1:4])
+
+#QC3
+dt_c <- dt
+dt_c3 <- dt_c[,c(79, 74)]
+
+rules_c3 <- apriori(dt_c3,
+                    parameter = list(supp = 0.1, conf = 0.01, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("fashion_innovativeness=high")))
+
+inspect((sort(rules_c3, by = "confidence"))[1:3])
+
+#QC4
+dt_c <- dt
+dt_c4 <- dt_c[,c(79, 73)]
+
+rules_c4 <- apriori(dt_c4,
+                    parameter = list(supp = 0.01, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("fashion_innovativeness=high")))
+
+inspect((sort(rules_c4, by = "confidence"))[1:5])
+
+#QC5
+dt_c <- dt
+dt_c5 <- dt_c[,c(79, 38:49)]
+
+rules_c5 <- apriori(dt_c5,
+                    parameter = list(supp = 0.1, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("fashion_innovativeness=high")))
+
+inspect((sort(rules_c5, by = "confidence"))[1:5])
+
+#QC6
+dt_c <- dt
+dt_c6 <- dt_c[,c(79, 38:49)]
+
+rules_c6 <- apriori(dt_c6,
+                    parameter = list(supp = 0.1, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("fashion_innovativeness=high")))
+
+inspect((sort(rules_c6, by = "lift"))[1:15])
+
+#QC7-8
+dt_c <- dt
+dt_c7 <- dt_c[,c(79, 38:49)]
+
+rules_c7 <- apriori(dt_c7,
+                    parameter = list(supp = 0.1, conf = 0.1, maxlen=2),
+                    appearance = list(default="rhs", lhs = c("fashion_innovativeness=high")))
+
+inspect((sort(rules_c7, by = "confidence"))[1:10])
+
+
+#hypothesize 
+dt_h <- dt
+
+dt_h1 <- dt_h[,c(65,79,78,74,76)]
+
+rules_h1 <- apriori(dt_h1,
+                    parameter = list(supp = 0.001, conf = 0.1,minlen=4 ,maxlen=4))
+
+rules_subset <- subset(rules_h1, lhs %ain% c("fashion_innovativeness=low","Q41.Sex=Male",
+                                         "sustainable_commitment=high"))
+rules_subset
+
+inspect((sort(rules_subset, by = "confidence"))[1:4])
+
+
+
+
+atop10subRules <- head(rules_a2, n = 10, by = "confidence")
+
+#plot(top10subRules, method = "graph",  engine = "htmlwidget")
 
 
 

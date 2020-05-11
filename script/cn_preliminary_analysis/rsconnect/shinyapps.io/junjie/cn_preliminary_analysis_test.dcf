@@ -5,8 +5,8 @@ account: junjie
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1674844
-bundleId: 2830253
+bundleId: 3133433
 url: https://junjie.shinyapps.io/cn_preliminary_analysis_test/
-when: 1582686929.15811
+when: 1589228083.31211
 asMultiple: FALSE
 asStatic: FALSE

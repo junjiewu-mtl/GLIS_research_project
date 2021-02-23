@@ -1,1 +1,1 @@
-# GLIS_research_project
+# GLIS research project: Fashion survey data analysis
